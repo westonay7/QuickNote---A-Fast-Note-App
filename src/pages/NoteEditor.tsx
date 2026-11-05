@@ -35,7 +35,6 @@ import {
   patchNote,
   setNoteTags,
   trashNote,
-  touchNote,
   updateNote,
   type NotePatch,
 } from '@/lib/api'
@@ -196,7 +195,6 @@ export function NoteEditorPage({ mode }: { mode: 'create' | 'edit' }) {
         } else {
           setDraftOffer(null)
         }
-        if (!note.deleted_at) void touchNote(note.id)
       })
       .catch((err: unknown) => {
         if (!cancelled) setLoadError(friendlyError(err))
@@ -265,7 +263,15 @@ export function NoteEditorPage({ mode }: { mode: 'create' | 'edit' }) {
           applyVersion(created.version)
           loadedIdRef.current = created.id
           clearDraft()
-          navTarget = silent || prefs.stayAfterSave ? `/app/notes/${created.id}` : '/app/notes'
+
+          if (silent) {
+            // Autosave while typing: update browser URL bar without tearing down or unmounting
+            window.history.replaceState(window.history.state, '', `/app/notes/${created.id}`)
+          } else if (prefs.stayAfterSave) {
+            window.history.replaceState(window.history.state, '', `/app/notes/${created.id}`)
+          } else {
+            navTarget = '/app/notes'
+          }
         } else {
           // ---- update with optimistic concurrency ----
           const res = await updateNote(serverNoteRef.current.id, input, versionRef.current)
@@ -273,7 +279,7 @@ export function NoteEditorPage({ mode }: { mode: 'create' | 'edit' }) {
             savingRef.current = false
             setConflict(true)
             setStatus('error')
-            toast.error('This note changed somewhere else — review the options above.')
+            toast.error('This note was updated elsewhere — review the options above.')
             return false
           }
           applyServerNote(res.note)
@@ -306,7 +312,7 @@ export function NoteEditorPage({ mode }: { mode: 'create' | 'edit' }) {
         if (!silent) toast.error(friendlyError(err))
         try {
           const { title: t2, content: c2, folderId: f2, tagIds: tg2 } = stateRef.current
-          saveDraft(activeId ?? 'new', {
+          saveDraft(activeIdRef.current ?? activeId ?? 'new', {
             title: t2,
             content: c2,
             folderId: f2,
@@ -326,7 +332,7 @@ export function NoteEditorPage({ mode }: { mode: 'create' | 'edit' }) {
       }
     },
     // eslint-disable-next-line
-    [activeId, serverNote, version, navigate, toast, bump],
+    [activeId, serverNote, version, navigate, toast, bump, mode, prefs.stayAfterSave],
   )
 
   const markDirty = useCallback(() => {
@@ -336,7 +342,7 @@ export function NoteEditorPage({ mode }: { mode: 'create' | 'edit' }) {
     // Best-effort draft for crash/offline recovery
     try {
       const { title: t, content: c, folderId: f, tagIds: tg } = stateRef.current
-      saveDraft(activeId ?? 'new', {
+      saveDraft(activeIdRef.current ?? activeId ?? 'new', {
         title: t,
         content: c,
         folderId: f,
@@ -644,7 +650,7 @@ export function NoteEditorPage({ mode }: { mode: 'create' | 'edit' }) {
 
   const onTitleSubmit = (e: FormEvent) => {
     e.preventDefault()
-    void save(false)
+    textareaRef.current?.focus()
   }
 
   // Early returns ------------------------------------------------------------
@@ -905,6 +911,12 @@ export function NoteEditorPage({ mode }: { mode: 'create' | 'edit' }) {
               setTitle(e.target.value)
               setValidationError(null)
               markDirty()
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                textareaRef.current?.focus()
+              }
             }}
             placeholder="Untitled note"
             maxLength={120}

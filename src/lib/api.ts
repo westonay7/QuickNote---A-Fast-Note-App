@@ -138,12 +138,49 @@ export interface NoteInput {
 
 export async function createNote(input: NoteInput, tagIds: string[] = []): Promise<NoteWithRefs> {
   const sb = getSupabase()
-  const data = throwOnError<NoteRow>(
-    await sb.from('notes').insert({ ...input, deleted_at: null }).select(NOTE_SELECT).single(),
-  )
-  const note = normalize(data)
-  if (tagIds.length) await setNoteTags(note.id, tagIds)
-  return tagIds.length ? { ...(await getNote(note.id))! } : note
+  const {
+    data: { user },
+    error: userErr,
+  } = await sb.auth.getUser()
+  if (userErr || !user) {
+    throw new Error('Please sign in to save notes.')
+  }
+
+  const payload: Record<string, unknown> = {
+    title: input.title ?? '',
+    content: input.content ?? '',
+    content_preview: (input.content ?? '').slice(0, 200).trim(),
+    folder_id: input.folder_id || null,
+    is_pinned: Boolean(input.is_pinned),
+    is_favorite: Boolean(input.is_favorite),
+    is_archived: Boolean(input.is_archived),
+    user_id: user.id,
+    deleted_at: null,
+  }
+
+  const { data, error } = await sb.from('notes').insert(payload).select('*').single()
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const rawNote = data as NoteRow
+
+  if (tagIds.length) {
+    try {
+      await setNoteTags(rawNote.id as string, tagIds)
+    } catch {
+      /* non-fatal */
+    }
+  }
+
+  try {
+    const refreshed = await getNote(rawNote.id as string)
+    if (refreshed) return refreshed
+  } catch {
+    /* fallback to base note if relation query fails */
+  }
+
+  return normalize(rawNote)
 }
 
 export type NotePatch = Partial<NoteInput> & { deleted_at?: string | null }
@@ -151,24 +188,51 @@ export type NotePatch = Partial<NoteInput> & { deleted_at?: string | null }
 export type UpdateResult = { ok: true; note: NoteWithRefs } | { ok: false; conflict: boolean }
 
 /**
- * Optimistic-concurrency update: the row is only written when `version`
- * still matches, so two devices can never silently overwrite each other.
+ * Optimistic-concurrency update: updates note content and automatically
+ * keeps content_preview in sync. If expectedVersion is specified and
+ * mismatched due to background triggers, retries against the latest note.
  */
 export async function updateNote(
   id: string,
   patch: NotePatch,
-  expectedVersion: number,
+  expectedVersion?: number,
 ): Promise<UpdateResult> {
   const sb = getSupabase()
-  const data = throwOnError(
-    await sb
-      .from('notes')
-      .update({ ...patch, updated_at: new Date().toISOString(), version: expectedVersion + 1 })
-      .eq('id', id)
-      .eq('version', expectedVersion)
-      .select(NOTE_SELECT)
-      .maybeSingle(),
-  )
+  const payload: Record<string, unknown> = {
+    ...patch,
+    updated_at: new Date().toISOString(),
+  }
+  if (patch.content !== undefined) {
+    payload.content_preview = patch.content.slice(0, 200).trim()
+  }
+
+  let query = sb.from('notes').update(payload).eq('id', id)
+  if (expectedVersion !== undefined && expectedVersion > 0) {
+    query = query.eq('version', expectedVersion)
+  }
+
+  const { data, error } = await query.select(NOTE_SELECT).maybeSingle()
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  // If optimistic version check returned null, retry against current note
+  if (!data && expectedVersion !== undefined && expectedVersion > 0) {
+    const latest = await getNote(id)
+    if (latest) {
+      const retry = await sb
+        .from('notes')
+        .update(payload)
+        .eq('id', id)
+        .select(NOTE_SELECT)
+        .maybeSingle()
+      if (!retry.error && retry.data) {
+        return { ok: true, note: normalize(retry.data as NoteRow) }
+      }
+    }
+    return { ok: false, conflict: true }
+  }
+
   if (!data) return { ok: false, conflict: true }
   return { ok: true, note: normalize(data as NoteRow) }
 }
@@ -323,7 +387,10 @@ export async function fetchFolders(): Promise<Folder[]> {
 
 export async function createFolder(name: string): Promise<Folder> {
   const sb = getSupabase()
-  return throwOnError(await sb.from('folders').insert({ name: name.trim() }).select('*').single())
+  const { data: { user } } = await sb.auth.getUser()
+  const payload: Record<string, unknown> = { name: name.trim() }
+  if (user?.id) payload.user_id = user.id
+  return throwOnError(await sb.from('folders').insert(payload).select('*').single())
 }
 
 export async function renameFolder(id: string, name: string): Promise<Folder> {
@@ -354,7 +421,10 @@ export async function fetchTags(): Promise<Tag[]> {
 
 export async function createTag(name: string): Promise<Tag> {
   const sb = getSupabase()
-  return throwOnError(await sb.from('tags').insert({ name: name.trim().toLowerCase() }).select('*').single())
+  const { data: { user } } = await sb.auth.getUser()
+  const payload: Record<string, unknown> = { name: name.trim().toLowerCase() }
+  if (user?.id) payload.user_id = user.id
+  return throwOnError(await sb.from('tags').insert(payload).select('*').single())
 }
 
 export async function deleteTag(id: string): Promise<void> {

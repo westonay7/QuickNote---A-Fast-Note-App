@@ -165,7 +165,7 @@ function AppRoutes() {
 
   return (
     <>
-      <Suspense fallback={<RouteFallback />} key={location.pathname}>
+      <Suspense fallback={<RouteFallback />}>
       <Routes location={location}>
         {/* Public */}
         <Route path="/" element={<Welcome />} />

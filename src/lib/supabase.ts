@@ -54,9 +54,11 @@ export function getSupabase(): SupabaseClient {
  * users. Never leaks SQL details, RLS internals, or secrets.
  */
 export function friendlyError(error: unknown): string {
+  if (!error) return 'An unexpected error occurred.'
+  if (typeof error === 'string') return error
   const err = error as { code?: string; message?: string; status?: number } | null
   const code = err?.code ?? ''
-  const message = err?.message ?? ''
+  const message = (error instanceof Error ? error.message : err?.message) ?? ''
   const text = `${code} ${message}`.toLowerCase()
 
   if (!isSupabaseConfigured) return 'QuickNote is not connected to Supabase yet. Check your .env file.'
@@ -73,13 +75,15 @@ export function friendlyError(error: unknown): string {
     return 'Too many attempts. Please wait a moment and try again.'
   if (code === '23505' || text.includes('duplicate key')) return 'That name is already in use.'
   if (code === '42501' || text.includes('row-level security') || text.includes('violates row-level'))
-    return 'You do not have permission to do that.'
+    return 'You do not have permission to do that, or your session has expired. Please sign in.'
   if (code === 'PGRST116' || text.includes('jwt') || text.includes('session'))
     return 'Your session has expired. Please sign in again.'
   if (code === '23503' || text.includes('foreign key')) return 'That item no longer exists.'
   if (text.includes('signup is disabled')) return 'Registration is currently disabled on this project.'
   if (text.includes('smtp') || text.includes('error sending'))
     return 'The email could not be sent. Please try again later or contact support.'
-  if (message) return 'Something went wrong. Please try again.'
+  if (message && message.length < 120 && !message.includes('{"') && !message.includes('PL/pgSQL')) {
+    return message
+  }
   return 'Something went wrong. Please try again.'
 }
