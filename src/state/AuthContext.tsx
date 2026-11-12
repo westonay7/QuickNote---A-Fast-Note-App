@@ -29,12 +29,32 @@ interface AuthApi {
   saveFullName: (fullName: string) => Promise<void>
 }
 
+function getStoredSession(): Session | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem('quicknote-auth')
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const sess = parsed?.currentSession ?? parsed
+    if (sess?.access_token && sess?.user) {
+      return sess as Session
+    }
+  } catch {
+    /* fallback to async getSession */
+  }
+  return null
+}
+
 const AuthContext = createContext<AuthApi | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { resetAll } = usePrefs()
-  const [session, setSession] = useState<Session | null>(null)
-  const [initializing, setInitializing] = useState(isSupabaseConfigured)
+  const [session, setSession] = useState<Session | null>(getStoredSession)
+  const [initializing, setInitializing] = useState(() => {
+    if (!isSupabaseConfigured) return false
+    // If we already have a valid stored session, we don't block the UI
+    return !getStoredSession()
+  })
   const [profile, setProfile] = useState<Profile | null>(null)
 
   // ---- session lifecycle --------------------------------------------------
@@ -43,13 +63,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const sb = getSupabase()
 
     sb.auth.getSession().then(({ data }) => {
-      setSession(data.session)
+      if (data?.session) {
+        setSession(data.session)
+      }
+      setInitializing(false)
+    }).catch(() => {
       setInitializing(false)
     })
 
-    const { data: sub } = sb.auth.onAuthStateChange((_event, next) => {
-      setSession(next)
-      if (!next) setProfile(null)
+    const { data: sub } = sb.auth.onAuthStateChange((event, next) => {
+      if (event === 'SIGNED_OUT') {
+        setSession(null)
+        setProfile(null)
+        return
+      }
+
+      if (next) {
+        setSession(next)
+      } else {
+        // Double check before clearing on transient resume / network drops
+        sb.auth.getSession().then(({ data }) => {
+          if (!data?.session) {
+            setSession(null)
+            setProfile(null)
+          } else {
+            setSession(data.session)
+          }
+        }).catch(() => undefined)
+      }
     })
     return () => sub.subscription.unsubscribe()
   }, [])

@@ -18,8 +18,17 @@ export function AppShell() {
   const [params] = useSearchParams()
   const online = useOnlineStatus()
 
-  // Close the mobile drawer whenever navigation happens
-  useEffect(() => setDrawerOpen(false), [location.pathname, location.search])
+  // Close the mobile drawer whenever navigation happens and remember last path
+  useEffect(() => {
+    setDrawerOpen(false)
+    if (location.pathname.startsWith('/app')) {
+      try {
+        sessionStorage.setItem('quicknote-last-path', location.pathname + location.search)
+      } catch {
+        // non-fatal
+      }
+    }
+  }, [location.pathname, location.search])
 
   // Close drawer on Escape
   useEffect(() => {
@@ -30,6 +39,7 @@ export function AppShell() {
   }, [drawerOpen])
 
   const isEditingNote = location.pathname.includes('/notes/new') || /\/notes\/[^/]+/.test(location.pathname)
+  const isAllNotes = location.pathname === '/app/notes' || location.pathname === '/app/all'
 
   return (
     <div className="flex min-h-screen bg-canvas dark:bg-canvas-dark">
@@ -82,8 +92,8 @@ export function AppShell() {
           <Outlet />
         </main>
 
-        {/* Mobile floating action button (Android note creation shortcut) */}
-        {!isEditingNote && (
+        {/* Mobile floating action button (hidden on editor and All Notes listing) */}
+        {!isEditingNote && !isAllNotes && (
           <Link
             to="/app/notes/new"
             aria-label="Create new note"

@@ -1,16 +1,19 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LogOut, Menu as MenuIcon, Moon, Plus, Search, Settings as SettingsIcon, Sun, UserRound } from 'lucide-react'
+import { LogOut, Menu as MenuIcon, Moon, Plus, RefreshCw, Search, Settings as SettingsIcon, Sun, UserRound } from 'lucide-react'
 import { Menu } from '@/components/Menu'
 import { NoteGlyph } from '@/components/Logo'
 import { PWAInstallButton } from '@/components/PWAInstallExperience'
 import { initials, cn } from '@/lib/format'
 import { useAuth } from '@/state/AuthContext'
 import { usePrefs } from '@/state/PrefsContext'
+import { useToast } from '@/state/ToastContext'
+import { usePWAUpdate } from '@/state/PWAUpdateContext'
 
 function titleFor(pathname: string): string {
   if (pathname === '/app') return 'Dashboard'
   if (pathname.startsWith('/app/search')) return 'Search'
+  if (pathname.startsWith('/app/chat')) return 'Gemini Chat'
   if (pathname.startsWith('/app/notes/new')) return 'New Note'
   if (/\/app\/notes\/[^/]+/.test(pathname)) return 'Note'
   if (pathname.startsWith('/app/notes')) return 'All Notes'
@@ -33,9 +36,26 @@ export function Header({ onOpenDrawer, searchQuery }: { onOpenDrawer: () => void
   const navigate = useNavigate()
   const { profile, signOut } = useAuth()
   const { update } = usePrefs()
+  const toast = useToast()
+  const { updateAvailable, isChecking, isUpdating, checkForUpdates, applyUpdate } = usePWAUpdate()
   const [query, setQuery] = useState(searchQuery)
 
   useEffect(() => setQuery(searchQuery), [searchQuery, location.pathname])
+
+  const handleCheckUpdates = async () => {
+    if (updateAvailable) {
+      applyUpdate()
+      return
+    }
+    const res = await checkForUpdates(true)
+    if (res === 'updated') {
+      toast.success('Update detected! Applying new version…')
+    } else if (res === 'up-to-date') {
+      toast.success('QuickNote is up to date.')
+    } else {
+      toast.error('Could not check for updates. Check connection.')
+    }
+  }
 
   const dark = document.documentElement.classList.contains('dark')
   const name = profile?.full_name || 'Your account'
@@ -132,6 +152,11 @@ export function Header({ onOpenDrawer, searchQuery }: { onOpenDrawer: () => void
                 onSelect: () => navigate('/app/settings'),
               },
               {
+                label: updateAvailable ? 'Apply update now' : isChecking ? 'Checking for updates…' : 'Check for updates',
+                icon: <RefreshCw className={`h-4 w-4 ${isChecking || isUpdating ? 'animate-spin text-brand-600' : ''}`} />,
+                onSelect: () => void handleCheckUpdates(),
+              },
+              {
                 label: 'Sign out',
                 icon: <LogOut className="h-4 w-4" />,
                 danger: true,
@@ -143,9 +168,17 @@ export function Header({ onOpenDrawer, searchQuery }: { onOpenDrawer: () => void
                 {...props}
                 type="button"
                 aria-label="Open account menu"
-                className="ml-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700 transition hover:bg-brand-200 dark:bg-brand-950 dark:text-brand-300 dark:hover:bg-brand-900"
+                className="relative ml-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700 transition hover:bg-brand-200 dark:bg-brand-950 dark:text-brand-300 dark:hover:bg-brand-900"
               >
                 {initials(name)}
+                {updateAvailable && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-brand-600 ring-2 ring-white dark:ring-surface-dark"
+                    title="Update ready"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                  </span>
+                )}
               </button>
             )}
           />

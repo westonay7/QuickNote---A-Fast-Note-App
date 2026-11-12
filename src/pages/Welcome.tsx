@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { ArrowRight, Check, FolderTree, Search, Timer, WifiOff } from 'lucide-react'
 import { Logo, NoteGlyph } from '@/components/Logo'
 import { PWAInstallButton } from '@/components/PWAInstallExperience'
+import { useAuth } from '@/state/AuthContext'
 
 const BENEFITS = [
   { icon: Timer, text: 'Capture notes quickly.' },
@@ -11,6 +12,15 @@ const BENEFITS = [
 ]
 
 export function Welcome() {
+  const { user, initializing } = useAuth()
+
+  // If already authenticated, redirect straight to user's notes / last visited page
+  if (!initializing && user) {
+    const lastPath = typeof window !== 'undefined' ? sessionStorage.getItem('quicknote-last-path') : null
+    const target = lastPath && lastPath.startsWith('/app') ? lastPath : '/app'
+    return <Navigate to={target} replace />
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-canvas dark:bg-canvas-dark">
       {/* Top bar */}

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Accessibility,
   Bell,
+  CheckCircle2,
   Database,
   Download,
   FileText,
@@ -11,8 +12,10 @@ import {
   LogOut,
   MessageSquare,
   Palette,
+  RefreshCw,
   RotateCcw,
   ShieldCheck,
+  Sparkles,
   Trash2,
   Upload,
   UserRound,
@@ -35,13 +38,14 @@ import {
   exportNotesText,
   parseImportFiles,
 } from '@/lib/export'
-import { formatBytes, initials } from '@/lib/format'
+import { formatBytes, initials, relativeTime } from '@/lib/format'
 import { friendlyError, supportEmail } from '@/lib/supabase'
 import type { SortKey, ViewMode } from '@/lib/types'
 import { useAuth } from '@/state/AuthContext'
 import { useData } from '@/state/DataContext'
 import { usePrefs } from '@/state/PrefsContext'
 import { useToast } from '@/state/ToastContext'
+import { usePWAUpdate } from '@/state/PWAUpdateContext'
 
 type SectionId =
   | 'appearance'
@@ -121,6 +125,27 @@ export function SettingsPage() {
   const [deletePhrase, setDeletePhrase] = useState('')
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const {
+    isChecking,
+    updateAvailable,
+    isUpdating,
+    lastChecked,
+    appVersion,
+    checkForUpdates,
+    applyUpdate,
+  } = usePWAUpdate()
+
+  const handleManualCheck = async () => {
+    const res = await checkForUpdates(true)
+    if (res === 'updated') {
+      toast.success('Update detected! Tap "Apply update now" or reload to apply changes.')
+    } else if (res === 'up-to-date') {
+      toast.success(`QuickNote is up to date (Version ${appVersion}).`)
+    } else {
+      toast.error('Could not check for updates. Check your connection and try again.')
+    }
+  }
 
   const bytes = useMemo(() => localBytes(), [])
   const email = user?.email ?? session?.user.email ?? ''
@@ -568,9 +593,22 @@ export function SettingsPage() {
                       <PWAInstallButton variant="settings" />
                     </dd>
                   </div>
-                  <div className="flex justify-between gap-4">
+                  <div className="flex justify-between items-center gap-4">
                     <dt className="text-zinc-500 dark:text-zinc-400">App version</dt>
-                    <dd className="font-medium text-zinc-800 dark:text-zinc-200">1.0.0 (PWA)</dd>
+                    <dd className="flex items-center gap-2">
+                      <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                        {appVersion} (PWA)
+                      </span>
+                      {updateAvailable ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+                          <Sparkles className="h-3 w-3" /> Update ready
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300">
+                          <CheckCircle2 className="h-3 w-3" /> Up to date
+                        </span>
+                      )}
+                    </dd>
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-zinc-500 dark:text-zinc-400">Replay onboarding</dt>
@@ -584,6 +622,56 @@ export function SettingsPage() {
                     </dd>
                   </div>
                 </dl>
+              </Card>
+
+              <Card
+                title="Check for updates"
+                description="Keep your phone and desktop app in sync with the latest features. Updates apply automatically on launch or when you tap Check for updates."
+              >
+                <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        {updateAvailable
+                          ? 'New version available!'
+                          : isChecking
+                          ? 'Checking for updates…'
+                          : 'QuickNote is up to date'}
+                      </p>
+                      <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                        {updateAvailable
+                          ? 'A new update has been published. Tap apply to refresh and use the latest features.'
+                          : lastChecked
+                          ? `Last checked ${relativeTime(lastChecked.toISOString())}`
+                          : 'Service Worker auto-update active.'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {updateAvailable ? (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={applyUpdate}
+                          loading={isUpdating}
+                        >
+                          <RefreshCw className={`h-4 w-4 ${isUpdating ? 'animate-spin' : ''}`} />
+                          Apply update now
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => void handleManualCheck()}
+                          loading={isChecking}
+                        >
+                          <RefreshCw className={`h-4 w-4 ${isChecking ? 'animate-spin' : ''}`} />
+                          Check for updates
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </Card>
 
               <Card title="Get help">

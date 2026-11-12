@@ -8,6 +8,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Pin,
+  RefreshCw,
   Settings,
   Star,
   Tags,
@@ -15,12 +16,14 @@ import {
   User,
   FileText,
   Archive,
+  Sparkles,
 } from 'lucide-react'
 import { Logo, NoteGlyph } from '@/components/Logo'
 import { PWAInstallButton } from '@/components/PWAInstallExperience'
-import { cn } from '@/lib/format'
-import { initials } from '@/lib/format'
+import { cn, initials } from '@/lib/format'
 import { useAuth } from '@/state/AuthContext'
+import { useToast } from '@/state/ToastContext'
+import { usePWAUpdate } from '@/state/PWAUpdateContext'
 
 interface NavItem {
   to: string
@@ -32,6 +35,7 @@ interface NavItem {
 const PRIMARY: NavItem[] = [
   { to: '/app', label: 'Dashboard', icon: Home, end: true },
   { to: '/app/notes', label: 'All Notes', icon: FileText },
+  { to: '/app/chat', label: 'Gemini Chat', icon: Sparkles },
   { to: '/app/pinned', label: 'Pinned Notes', icon: Pin },
   { to: '/app/favorites', label: 'Favorites', icon: Star },
   { to: '/app/recent', label: 'Recent Notes', icon: Clock },
@@ -93,6 +97,8 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggleCollapse, onNavigate, variant = 'desktop' }: SidebarProps) {
   const { profile, signOut } = useAuth()
+  const toast = useToast()
+  const { isChecking, updateAvailable, checkForUpdates, applyUpdate, appVersion } = usePWAUpdate()
   const isDrawer = variant === 'drawer'
   const showLabels = isDrawer || !collapsed
   const name = profile?.full_name || 'Your account'
@@ -100,6 +106,21 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate, variant = 'de
   const handleSignOut = () => {
     onNavigate?.()
     void signOut()
+  }
+
+  const handleCheckUpdates = async () => {
+    if (updateAvailable) {
+      applyUpdate()
+      return
+    }
+    const res = await checkForUpdates(true)
+    if (res === 'updated') {
+      toast.success('Update detected! Applying new version…')
+    } else if (res === 'up-to-date') {
+      toast.success(`QuickNote is up to date (v${appVersion}).`)
+    } else {
+      toast.error('Could not check for updates. Check connection.')
+    }
   }
 
   return (
@@ -134,8 +155,19 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate, variant = 'de
         ))}
 
         {showLabels && (
-          <div className="mt-4 pt-2 border-t border-zinc-100 dark:border-white/5">
+          <div className="mt-4 pt-2 border-t border-zinc-100 dark:border-white/5 space-y-1">
             <PWAInstallButton variant="sidebar" />
+            <button
+              type="button"
+              onClick={() => void handleCheckUpdates()}
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-200"
+            >
+              <span className="flex items-center gap-2">
+                <RefreshCw className={`h-3.5 w-3.5 ${isChecking ? 'animate-spin text-brand-600' : ''}`} />
+                <span>{updateAvailable ? 'Update ready' : isChecking ? 'Checking…' : 'Check for updates'}</span>
+              </span>
+              <span className="text-[10px] text-zinc-400">v{appVersion}</span>
+            </button>
           </div>
         )}
       </nav>

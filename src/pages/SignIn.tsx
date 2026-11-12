@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { AuthLayout } from '@/components/AuthLayout'
 import { Button, Field, Input } from '@/components/ui'
@@ -10,6 +10,7 @@ import { useToast } from '@/state/ToastContext'
 
 export function SignIn() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [params] = useSearchParams()
   const { signIn, isAuthenticated, initializing } = useAuth()
   const toast = useToast()
@@ -22,7 +23,9 @@ export function SignIn() {
   const [submitting, setSubmitting] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
 
-  const next = params.get('next') ?? '/app'
+  const fromState = (location.state as { from?: string } | null)?.from
+  const lastPath = typeof window !== 'undefined' ? sessionStorage.getItem('quicknote-last-path') : null
+  const next = fromState ?? params.get('next') ?? (lastPath && lastPath.startsWith('/app') ? lastPath : '/app')
   const notice = params.get('notice')
 
   if (!initializing && isAuthenticated) return <Navigate to={next} replace />

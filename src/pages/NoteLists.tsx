@@ -4,16 +4,34 @@ import { NotesView } from '@/components/NotesView'
 import { EmptyState, CenterSpinner } from '@/components/ui'
 import { useFolders, useTags } from '@/hooks/useCatalog'
 
-export const AllNotesPage = () => <NotesView scope="all" />
+export const AllNotesPage = () => (
+  <NotesView
+    scope="all"
+    showCreate={false}
+    title="All Notes"
+    description="A complete directory of all notes you have created."
+    emptyTitle="No notes created yet"
+    emptyDescription="All notes you create in QuickNote will be listed here."
+  />
+)
 export const PinnedPage = () => (
-  <NotesView scope="pinned" description="Notes you have pinned stay at the top of your workspace." />
+  <NotesView
+    scope="pinned"
+    showCreate={false}
+    description="Notes you have pinned stay at the top of your workspace."
+  />
 )
 export const FavoritesPage = () => (
-  <NotesView scope="favorites" description="Everything you have starred, in one place." />
+  <NotesView
+    scope="favorites"
+    showCreate={false}
+    description="Everything you have starred, in one place."
+  />
 )
 export const RecentPage = () => (
   <NotesView
     scope="recent"
+    showCreate={false}
     description="Notes you opened or edited most recently — “recent” means the last 30 days."
   />
 )

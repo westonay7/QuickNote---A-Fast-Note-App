@@ -104,15 +104,36 @@ export async function fetchNotes(
 
   let q = scopeQuery(scope)
   if (folderId) q = q.eq('folder_id', folderId)
-  const { data, error } = await q.order(col, { ascending }).range(from, to)
-  if (error) throw new Error(error.message)
-  const notes = (data as NoteRow[]).map(normalize)
-  return { notes, hasMore: data.length === PAGE_SIZE }
+  let { data, error } = await q.order(col, { ascending }).range(from, to)
+  if (error) {
+    // If relational join fails, fallback to basic notes query
+    const sb = getSupabase()
+    let retryQ: any = sb.from('notes').select('*')
+    if (scope === 'trash') {
+      retryQ = retryQ.not('deleted_at', 'is', null)
+    } else {
+      retryQ = retryQ.is('deleted_at', null)
+      retryQ = scope === 'archived' ? retryQ.eq('is_archived', true) : retryQ.eq('is_archived', false)
+      if (scope === 'pinned') retryQ = retryQ.eq('is_pinned', true)
+      if (scope === 'favorites') retryQ = retryQ.eq('is_favorite', true)
+    }
+    if (folderId) retryQ = retryQ.eq('folder_id', folderId)
+    const retryRes = await retryQ.order(col, { ascending }).range(from, to)
+    if (retryRes.error) throw new Error(retryRes.error.message)
+    data = retryRes.data
+  }
+  const notes = ((data ?? []) as NoteRow[]).map(normalize)
+  return { notes, hasMore: (data?.length ?? 0) === PAGE_SIZE }
 }
 
 export async function getNote(id: string): Promise<NoteWithRefs | null> {
   const sb = getSupabase()
-  const data = throwOnError(await sb.from('notes').select(NOTE_SELECT).eq('id', id).maybeSingle())
+  let { data, error } = await sb.from('notes').select(NOTE_SELECT).eq('id', id).maybeSingle()
+  if (error) {
+    const fallback = await sb.from('notes').select('*').eq('id', id).maybeSingle()
+    if (fallback.error) throw new Error(fallback.error.message)
+    data = fallback.data
+  }
   if (!data) return null
   return normalize(data as NoteRow)
 }

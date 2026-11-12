@@ -17,6 +17,8 @@ import { AppShell } from "@/components/AppShell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Logo } from "@/components/Logo";
 import { PWAInstallBanner } from "@/components/PWAInstallExperience";
+import { PWAUpdateBanner } from "@/components/PWAUpdateBanner";
+import { PWAUpdateProvider } from "@/state/PWAUpdateContext";
 import { Button, Skeleton } from "@/components/ui";
 
 import { Welcome } from "@/pages/Welcome";
@@ -44,6 +46,7 @@ const NoteEditorPage = lazy(() => import("@/pages/NoteEditor").then((m) => ({ de
 const FoldersPage = lazy(() => import("@/pages/FoldersPage").then((m) => ({ default: m.FoldersPage })));
 const TagsPage = lazy(() => import("@/pages/TagsPage").then((m) => ({ default: m.TagsPage })));
 const SearchPage = lazy(() => import("@/pages/SearchPage").then((m) => ({ default: m.SearchPage })));
+const GeminiChatPage = lazy(() => import("@/pages/GeminiChatPage").then((m) => ({ default: m.GeminiChatPage })));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage").then((m) => ({ default: m.ProfilePage })));
 const HelpPage = lazy(() => import("@/pages/HelpPage").then((m) => ({ default: m.HelpPage })));
@@ -88,10 +91,13 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Keeps signed-in users off the auth screens. */
 function PublicOnly({ children }: { children: ReactNode }) {
   const { user, initializing } = useAuth();
-  if (!initializing && user) return <Navigate to="/app" replace />;
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
+  const lastPath = typeof window !== 'undefined' ? sessionStorage.getItem('quicknote-last-path') : null;
+  const target = from ?? (lastPath && lastPath.startsWith('/app') ? lastPath : '/app');
+  if (!initializing && user) return <Navigate to={target} replace />;
   return <>{children}</>;
 }
 
@@ -204,6 +210,7 @@ function AppRoutes() {
         >
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="notes" element={<AllNotesPage />} />
           <Route path="notes/new" element={<NoteEditorPage mode="create" />} />
           <Route path="notes/:noteId" element={<NoteEditorPage mode="edit" />} />
           <Route path="all" element={<AllNotesPage />} />
@@ -217,6 +224,7 @@ function AppRoutes() {
           <Route path="tags" element={<TagsPage />} />
           <Route path="tags/:tagId" element={<TagNotesPage />} />
           <Route path="search" element={<SearchPage />} />
+          <Route path="chat" element={<GeminiChatPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="help" element={<HelpPage />} />
@@ -228,6 +236,7 @@ function AppRoutes() {
       </Routes>
     </Suspense>
     <PWAInstallBanner />
+    <PWAUpdateBanner />
   </>
   );
 }
@@ -258,7 +267,9 @@ export function App() {
       <ToastProvider>
         <PrefsProvider>
           <AuthProvider>
-            <RouterProvider router={router} />
+            <PWAUpdateProvider>
+              <RouterProvider router={router} />
+            </PWAUpdateProvider>
           </AuthProvider>
         </PrefsProvider>
       </ToastProvider>

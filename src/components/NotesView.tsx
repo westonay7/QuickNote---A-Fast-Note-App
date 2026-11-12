@@ -7,10 +7,12 @@ import {
   FolderOpen,
   Pin,
   Plus,
+  Search,
   SortAsc,
   Star,
   Tags,
   Trash2,
+  X,
 } from 'lucide-react'
 import { ConfirmDialog } from './Modal'
 import { NoteCard } from './NoteCard'
@@ -46,10 +48,10 @@ const SCOPE_META: Record<
 > = {
   all: {
     title: 'All Notes',
-    description: 'Everything you have written, in one place.',
+    description: 'A complete directory of all notes you have created.',
     icon: FileText,
-    emptyTitle: 'No notes yet',
-    emptyDescription: 'Create your first note and it will appear here.',
+    emptyTitle: 'No notes created yet',
+    emptyDescription: 'All notes you create in QuickNote will be listed here.',
   },
   pinned: {
     title: 'Pinned Notes',
@@ -135,6 +137,7 @@ export function NotesView({
   const [params, setParams] = useSearchParams()
   const [view, setView] = useState<ViewMode>(prefs.defaultView)
   const [emptying, setEmptying] = useState(false)
+  const [filterQuery, setFilterQuery] = useState('')
 
   const sortParam = params.get('sort') as SortKey | null
   const sort: SortKey =
@@ -164,8 +167,18 @@ export function NotesView({
       const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
       list = list.filter((n) => new Date(n.updated_at).getTime() >= cutoff)
     }
+    if (filterQuery.trim()) {
+      const q = filterQuery.trim().toLowerCase()
+      list = list.filter(
+        (n) =>
+          (n.title && n.title.toLowerCase().includes(q)) ||
+          (n.content && n.content.toLowerCase().includes(q)) ||
+          (n.folder_name && n.folder_name.toLowerCase().includes(q)) ||
+          n.tags.some((t) => t.name.toLowerCase().includes(q)),
+      )
+    }
     return list
-  }, [notes, scope, folderId, tagId])
+  }, [notes, scope, folderId, tagId, filterQuery])
 
   const doEmptyTrash = async () => {
     setEmptying(true)
@@ -181,6 +194,7 @@ export function NotesView({
   }
 
   const ScopeIcon = meta.icon
+  const allowCreate = showCreate && scope !== 'trash' && scope !== 'all'
 
   return (
     <>
@@ -195,7 +209,7 @@ export function NotesView({
                 Empty Trash
               </Button>
             )}
-            {showCreate && scope !== 'trash' && (
+            {allowCreate && (
               <Link
                 to="/app/notes/new"
                 className={`${LINK_BTN} bg-brand-600 text-white shadow-soft hover:bg-brand-700`}
@@ -208,14 +222,41 @@ export function NotesView({
         }
       />
 
-      {/* Toolbar: result count + sort + view */}
+      {/* Toolbar: result count + instant filter + sort + view */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-zinc-500 dark:text-zinc-400" aria-live="polite">
           {loading
             ? 'Loading notes…'
-            : `${filteredNotes.length} note${filteredNotes.length === 1 ? '' : 's'}`}
+            : filterQuery.trim()
+              ? `Showing ${filteredNotes.length} of ${notes.length} note${notes.length === 1 ? '' : 's'}`
+              : `${filteredNotes.length} note${filteredNotes.length === 1 ? '' : 's'}`}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {notes.length > 0 && (
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute inset-y-0 left-2.5 my-auto h-3.5 w-3.5 text-zinc-400"
+                aria-hidden
+              />
+              <input
+                type="text"
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+                placeholder="Filter notes…"
+                className="h-9 w-36 sm:w-44 rounded-lg border border-zinc-200 bg-white pl-8 pr-7 text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-brand-500 focus:outline-none dark:border-white/10 dark:bg-surface-dark dark:text-zinc-100"
+              />
+              {filterQuery && (
+                <button
+                  type="button"
+                  onClick={() => setFilterQuery('')}
+                  aria-label="Clear filter"
+                  className="absolute inset-y-0 right-2 my-auto h-4 w-4 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
           <label htmlFor={`sort-${scope}`} className="sr-only">
             Sort notes
           </label>
@@ -228,7 +269,7 @@ export function NotesView({
               id={`sort-${scope}`}
               value={sort}
               onChange={(e) => setSort(e.target.value)}
-              className="h-9 w-44 pl-8 text-xs sm:text-sm"
+              className="h-9 w-40 sm:w-44 pl-8 text-xs sm:text-sm"
             >
               {SORT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -265,24 +306,23 @@ export function NotesView({
 
       {!loading && !error && filteredNotes.length === 0 && (
         <EmptyState
-          icon={<ScopeIcon className="h-6 w-6" aria-hidden />}
-          title={emptyTitle ?? meta.emptyTitle}
-          description={emptyDescription ?? meta.emptyDescription}
+          icon={filterQuery ? <Search className="h-6 w-6" aria-hidden /> : <ScopeIcon className="h-6 w-6" aria-hidden />}
+          title={filterQuery ? 'No notes matched your filter' : emptyTitle ?? meta.emptyTitle}
+          description={
+            filterQuery
+              ? `No notes matched "${filterQuery}". Try clearing the filter to see all your notes.`
+              : emptyDescription ?? meta.emptyDescription
+          }
           action={
-            scope === 'trash' ? (
-              undefined
-            ) : showCreate ? (
+            filterQuery ? (
+              <Button variant="secondary" onClick={() => setFilterQuery('')}>
+                Clear filter
+              </Button>
+            ) : allowCreate ? (
               <Link to="/app/notes/new" className={`${LINK_BTN} bg-brand-600 text-white shadow-soft hover:bg-brand-700`}>
                 <Plus className="h-4 w-4" aria-hidden /> Create a note
               </Link>
-            ) : (
-              <Link
-                to="/app/notes"
-                className={`${LINK_BTN} border border-zinc-200 bg-white text-zinc-700 dark:border-white/10 dark:bg-surface-dark dark:text-zinc-200`}
-              >
-                Browse all notes
-              </Link>
-            )
+            ) : undefined
           }
         />
       )}

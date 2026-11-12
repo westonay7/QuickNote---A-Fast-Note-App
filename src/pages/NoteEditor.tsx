@@ -489,6 +489,17 @@ export function NoteEditorPage({ mode }: { mode: 'create' | 'edit' }) {
     return () => window.removeEventListener('beforeunload', handler)
   }, [dirty])
 
+  // Automatically flush unsaved note changes when app is minimized or hidden
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden' && dirtyRef.current) {
+        void save(true)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [save])
+
   // Block in-app navigation while unsaved -----------------------------------
   // Reads `dirtyRef` rather than the rendered flag so a navigation that happens
   // right after a successful save (dirtyRef already cleared) is not blocked.
