@@ -1,9 +1,11 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Accessibility,
   Bell,
+  Check,
   CheckCircle2,
+  ChevronDown,
   Database,
   Download,
   FileText,
@@ -70,7 +72,7 @@ const SECTION_LIST: { id: SectionId; label: string; icon: typeof Palette }[] = [
 
 function Card({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
-    <section className="card p-5 sm:p-6" aria-label={title}>
+    <section className="card min-w-0 p-4 sm:p-6" aria-label={title}>
       <h2 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-base">
         {title}
       </h2>
@@ -136,10 +138,36 @@ export function SettingsPage() {
     applyUpdate,
   } = usePWAUpdate()
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false)
+    }
+    const onPointerDown = (e: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('mousedown', onPointerDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('mousedown', onPointerDown)
+    }
+  }, [mobileMenuOpen])
+
   const handleManualCheck = async () => {
+    if (updateAvailable) {
+      toast.success('Applying update and reloading…')
+      applyUpdate()
+      return
+    }
     const res = await checkForUpdates(true)
     if (res === 'updated') {
-      toast.success('Update detected! Tap "Apply update now" or reload to apply changes.')
+      toast.success('Update found! Applying changes and reloading…')
     } else if (res === 'up-to-date') {
       toast.success(`QuickNote is up to date (Version ${appVersion}).`)
     } else {
@@ -155,7 +183,11 @@ export function SettingsPage() {
     const next = new URLSearchParams(params)
     next.set('section', id)
     setParams(next, { replace: true })
+    setMobileMenuOpen(false)
   }
+
+  const activeSectionItem = SECTION_LIST.find((s) => s.id === section) ?? SECTION_LIST[0]
+  const ActiveSectionIcon = activeSectionItem.icon
 
   /* ------------------------- data actions ------------------------- */
 
@@ -231,19 +263,88 @@ export function SettingsPage() {
     <>
       <PageHeader title="Settings" description="Personalize QuickNote and manage your data." />
 
-      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        {/* Section navigation */}
-        <nav aria-label="Settings sections" className="lg:sticky lg:top-24 lg:self-start">
-          <ul className="flex gap-1.5 overflow-x-auto scroll-area pb-2 lg:flex-col lg:overflow-visible lg:pb-0">
+      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-6">
+        {/* Mobile-friendly collapsible section menu (< lg) */}
+        <div ref={mobileMenuRef} className="relative w-full min-w-0 lg:hidden">
+          <button
+            type="button"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="settings-mobile-menu"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200/90 bg-white px-3.5 py-2.5 text-left shadow-soft transition hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:border-white/10 dark:bg-surface-dark dark:hover:bg-white/5"
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/70 dark:text-brand-300">
+                <ActiveSectionIcon className="h-4 w-4" aria-hidden />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                  Settings section
+                </span>
+                <span className="block truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  {activeSectionItem.label}
+                </span>
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              <span>Menu</span>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-150 ${mobileMenuOpen ? 'rotate-180' : ''}`}
+                aria-hidden
+              />
+            </span>
+          </button>
+
+          {mobileMenuOpen && (
+            <nav
+              id="settings-mobile-menu"
+              aria-label="Settings sections"
+              className="mt-2 rounded-xl border border-zinc-200/90 bg-white p-1.5 shadow-raised animate-scale-in dark:border-white/10 dark:bg-surface-dark"
+            >
+              <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                {SECTION_LIST.map(({ id, label, icon: Icon }) => {
+                  const active = section === id
+                  return (
+                    <li key={id} className="min-w-0">
+                      <button
+                        type="button"
+                        aria-current={active ? 'page' : undefined}
+                        onClick={() => setSection(id)}
+                        className={`flex w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
+                          active
+                            ? 'bg-brand-600 text-white shadow-soft'
+                            : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/5 dark:hover:text-zinc-100'
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                          <span className="truncate">{label}</span>
+                        </span>
+                        {active && <Check className="h-4 w-4 shrink-0" aria-hidden />}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </nav>
+          )}
+        </div>
+
+        {/* Desktop sidebar navigation (>= lg) */}
+        <nav
+          aria-label="Settings sections"
+          className="hidden lg:sticky lg:top-24 lg:block lg:self-start"
+        >
+          <ul className="flex flex-col gap-1">
             {SECTION_LIST.map(({ id, label, icon: Icon }) => {
               const active = section === id
               return (
-                <li key={id} className="shrink-0">
+                <li key={id}>
                   <button
                     type="button"
                     aria-current={active ? 'page' : undefined}
                     onClick={() => setSection(id)}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
                       active
                         ? 'bg-brand-600 text-white shadow-soft'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-100'
@@ -259,7 +360,7 @@ export function SettingsPage() {
         </nav>
 
         {/* Section content */}
-        <div className="min-w-0 space-y-6">
+        <div className="min-w-0 w-full space-y-5 sm:space-y-6">
           {section === 'appearance' && (
             <>
               <Card title="Theme" description="Choose how QuickNote looks. Your choice is remembered on this device.">
@@ -306,7 +407,7 @@ export function SettingsPage() {
                 <div className="flex items-center gap-4">
                   <span
                     aria-hidden
-                    className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white"
                   >
                     {initials(profile?.full_name ?? email)}
                   </span>
@@ -416,16 +517,16 @@ export function SettingsPage() {
 
               <Card title="Session" description="Information about your current session, when available.">
                 <dl className="space-y-2 text-sm">
-                  <div className="flex justify-between gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                     <dt className="text-zinc-500 dark:text-zinc-400">Signed in as</dt>
-                    <dd className="truncate font-medium text-zinc-800 dark:text-zinc-200">{email || '—'}</dd>
+                    <dd className="min-w-0 max-w-full truncate font-medium text-zinc-800 dark:text-zinc-200">{email || '—'}</dd>
                   </div>
-                  <div className="flex justify-between gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                     <dt className="text-zinc-500 dark:text-zinc-400">Email status</dt>
                     <dd>{verified ? <Badge tone="success">Verified</Badge> : <Badge tone="warning">Unverified</Badge>}</dd>
                   </div>
                   {session?.user.last_sign_in_at && (
-                    <div className="flex justify-between gap-4">
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                       <dt className="text-zinc-500 dark:text-zinc-400">Last sign-in</dt>
                       <dd className="text-right text-zinc-700 dark:text-zinc-300">
                         {new Date(session.user.last_sign_in_at).toLocaleString()}
@@ -474,33 +575,33 @@ export function SettingsPage() {
               description="Only supported notifications exist here — there are no switches for things the app doesn't actually do."
             >
               <ul className="space-y-3 text-sm text-zinc-600 dark:text-zinc-300">
-                <li className="flex items-start justify-between gap-4 rounded-lg border border-zinc-100 p-3 dark:border-white/10">
-                  <span>
+                <li className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-zinc-100 p-3 sm:flex-nowrap dark:border-white/10">
+                  <span className="min-w-0 flex-1">
                     <strong className="block font-medium text-zinc-900 dark:text-zinc-100">Action toasts</strong>
                     In-app confirmations for saves, deletes, exports and errors. Always shown.
                   </span>
-                  <Badge tone="success">On</Badge>
+                  <Badge tone="success" className="shrink-0">On</Badge>
                 </li>
-                <li className="flex items-start justify-between gap-4 rounded-lg border border-zinc-100 p-3 dark:border-white/10">
-                  <span>
+                <li className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-zinc-100 p-3 sm:flex-nowrap dark:border-white/10">
+                  <span className="min-w-0 flex-1">
                     <strong className="block font-medium text-zinc-900 dark:text-zinc-100">Security emails</strong>
                     Email verification and password reset messages. Required for account safety.
                   </span>
-                  <Badge tone="success">Always on</Badge>
+                  <Badge tone="success" className="shrink-0">Always on</Badge>
                 </li>
-                <li className="flex items-start justify-between gap-4 rounded-lg border border-zinc-100 p-3 dark:border-white/10">
-                  <span>
+                <li className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-zinc-100 p-3 sm:flex-nowrap dark:border-white/10">
+                  <span className="min-w-0 flex-1">
                     <strong className="block font-medium text-zinc-900 dark:text-zinc-100">Browser push notifications</strong>
                     Not used — QuickNote never prompts for notification permission.
                   </span>
-                  <Badge>Off</Badge>
+                  <Badge className="shrink-0">Off</Badge>
                 </li>
-                <li className="flex items-start justify-between gap-4 rounded-lg border border-zinc-100 p-3 dark:border-white/10">
-                  <span>
+                <li className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-zinc-100 p-3 sm:flex-nowrap dark:border-white/10">
+                  <span className="min-w-0 flex-1">
                     <strong className="block font-medium text-zinc-900 dark:text-zinc-100">Product announcements</strong>
                     None are sent in this version.
                   </span>
-                  <Badge>None</Badge>
+                  <Badge className="shrink-0">None</Badge>
                 </li>
               </ul>
             </Card>
@@ -567,11 +668,11 @@ export function SettingsPage() {
 
               <Card title="Storage on this device" description="Notes themselves live in the cloud — only preferences and drafts stay here.">
                 <dl className="space-y-2 text-sm">
-                  <div className="flex justify-between gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                     <dt className="text-zinc-500 dark:text-zinc-400">Local preferences & draft</dt>
                     <dd className="font-medium tabular-nums text-zinc-800 dark:text-zinc-200">{formatBytes(bytes)}</dd>
                   </div>
-                  <div className="flex justify-between gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                     <dt className="text-zinc-500 dark:text-zinc-400">Note storage</dt>
                     <dd className="text-zinc-800 dark:text-zinc-200">Supabase (cloud)</dd>
                   </div>
@@ -587,15 +688,15 @@ export function SettingsPage() {
             <>
               <Card title="QuickNote" description="Capture your thoughts. Keep everything organized.">
                 <dl className="space-y-3 text-sm">
-                  <div className="flex justify-between items-center gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                     <dt className="text-zinc-500 dark:text-zinc-400">App installation</dt>
                     <dd>
                       <PWAInstallButton variant="settings" />
                     </dd>
                   </div>
-                  <div className="flex justify-between items-center gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                     <dt className="text-zinc-500 dark:text-zinc-400">App version</dt>
-                    <dd className="flex items-center gap-2">
+                    <dd className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-zinc-800 dark:text-zinc-200">
                         {appVersion} (PWA)
                       </span>
@@ -610,7 +711,7 @@ export function SettingsPage() {
                       )}
                     </dd>
                   </div>
-                  <div className="flex justify-between gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                     <dt className="text-zinc-500 dark:text-zinc-400">Replay onboarding</dt>
                     <dd>
                       <Link
@@ -626,28 +727,32 @@ export function SettingsPage() {
 
               <Card
                 title="Check for updates"
-                description="Keep your phone and desktop app in sync with the latest features. Updates apply automatically on launch or when you tap Check for updates."
+                description="Keep your phone and desktop app in sync with the latest features. Tapping Check for updates checks for new changes and applies them automatically."
               >
                 <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                        {updateAvailable
+                        {isUpdating
+                          ? 'Applying new update…'
+                          : updateAvailable
                           ? 'New version available!'
                           : isChecking
                           ? 'Checking for updates…'
                           : 'QuickNote is up to date'}
                       </p>
                       <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                        {updateAvailable
-                          ? 'A new update has been published. Tap apply to refresh and use the latest features.'
+                        {isUpdating
+                          ? 'Installing latest changes and refreshing the app…'
+                          : updateAvailable
+                          ? 'A new update is ready. Tap to apply and reload immediately.'
                           : lastChecked
                           ? `Last checked ${relativeTime(lastChecked.toISOString())}`
-                          : 'Service Worker auto-update active.'}
+                          : 'Checks server for the latest app changes.'}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                       {updateAvailable ? (
                         <Button
                           variant="primary"
@@ -656,17 +761,17 @@ export function SettingsPage() {
                           loading={isUpdating}
                         >
                           <RefreshCw className={`h-4 w-4 ${isUpdating ? 'animate-spin' : ''}`} />
-                          Apply update now
+                          {isUpdating ? 'Applying…' : 'Apply update now'}
                         </Button>
                       ) : (
                         <Button
                           variant="secondary"
                           size="sm"
                           onClick={() => void handleManualCheck()}
-                          loading={isChecking}
+                          loading={isChecking || isUpdating}
                         >
-                          <RefreshCw className={`h-4 w-4 ${isChecking ? 'animate-spin' : ''}`} />
-                          Check for updates
+                          <RefreshCw className={`h-4 w-4 ${isChecking || isUpdating ? 'animate-spin' : ''}`} />
+                          {isUpdating ? 'Applying…' : isChecking ? 'Checking…' : 'Check for updates'}
                         </Button>
                       )}
                     </div>

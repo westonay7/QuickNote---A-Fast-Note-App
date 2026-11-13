@@ -42,7 +42,7 @@ export function AppShell() {
   const isAllNotes = location.pathname === '/app/notes' || location.pathname === '/app/all'
 
   return (
-    <div className="flex min-h-screen bg-canvas dark:bg-canvas-dark">
+    <div className="flex min-h-screen overflow-x-clip bg-canvas dark:bg-canvas-dark">
       <a
         href="#main-content"
         className="sr-only rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
@@ -87,7 +87,7 @@ export function AppShell() {
 
         <main
           id="main-content"
-          className={cn('mx-auto w-full max-w-[90rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 pb-safe')}
+          className={cn('mx-auto w-full min-w-0 max-w-[90rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 pb-safe')}
         >
           <Outlet />
         </main>

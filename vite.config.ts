@@ -32,7 +32,7 @@ export default defineConfig({
     tailwindcss(),
     stripCloudflareRedirectsPlugin(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       manifestFilename: 'manifest.webmanifest',
       includeAssets: [
         'favicon.svg',
@@ -106,6 +106,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,json}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],

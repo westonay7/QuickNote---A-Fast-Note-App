@@ -96,7 +96,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggleCollapse, onNavigate, variant = 'desktop' }: SidebarProps) {
   const { profile, signOut } = useAuth()
   const toast = useToast()
-  const { isChecking, updateAvailable, checkForUpdates, applyUpdate, appVersion } = usePWAUpdate()
+  const { isChecking, isUpdating, updateAvailable, checkForUpdates, applyUpdate, appVersion } = usePWAUpdate()
   const isDrawer = variant === 'drawer'
   const showLabels = isDrawer || !collapsed
   const name = profile?.full_name || 'Your account'
@@ -107,13 +107,15 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate, variant = 'de
   }
 
   const handleCheckUpdates = async () => {
+    if (isChecking || isUpdating) return
     if (updateAvailable) {
+      toast.success('Applying update and reloading…')
       applyUpdate()
       return
     }
     const res = await checkForUpdates(true)
     if (res === 'updated') {
-      toast.success('Update detected! Applying new version…')
+      toast.success('Update found! Applying changes and reloading…')
     } else if (res === 'up-to-date') {
       toast.success(`QuickNote is up to date (v${appVersion}).`)
     } else {
@@ -157,12 +159,21 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate, variant = 'de
             <PWAInstallButton variant="sidebar" />
             <button
               type="button"
+              disabled={isChecking || isUpdating}
               onClick={() => void handleCheckUpdates()}
-              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-200"
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 disabled:opacity-60 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-200"
             >
               <span className="flex items-center gap-2">
-                <RefreshCw className={`h-3.5 w-3.5 ${isChecking ? 'animate-spin text-brand-600' : ''}`} />
-                <span>{updateAvailable ? 'Update ready' : isChecking ? 'Checking…' : 'Check for updates'}</span>
+                <RefreshCw className={`h-3.5 w-3.5 ${isChecking || isUpdating ? 'animate-spin text-brand-600' : ''}`} />
+                <span>
+                  {isUpdating
+                    ? 'Applying update…'
+                    : updateAvailable
+                    ? 'Update ready'
+                    : isChecking
+                    ? 'Checking…'
+                    : 'Check for updates'}
+                </span>
               </span>
               <span className="text-[10px] text-zinc-400">v{appVersion}</span>
             </button>

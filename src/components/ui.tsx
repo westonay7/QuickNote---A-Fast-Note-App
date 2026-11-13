@@ -368,7 +368,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className="inline-flex rounded-lg border border-zinc-200 bg-white p-0.5 shadow-soft dark:border-white/10 dark:bg-surface-dark"
+      className="inline-flex max-w-full flex-wrap rounded-lg border border-zinc-200 bg-white p-0.5 shadow-soft dark:border-white/10 dark:bg-surface-dark"
     >
       {options.map((opt) => (
         <button

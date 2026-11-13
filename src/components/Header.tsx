@@ -42,13 +42,15 @@ export function Header({ onOpenDrawer, searchQuery }: { onOpenDrawer: () => void
   useEffect(() => setQuery(searchQuery), [searchQuery, location.pathname])
 
   const handleCheckUpdates = async () => {
+    if (isChecking || isUpdating) return
     if (updateAvailable) {
+      toast.success('Applying update and reloading…')
       applyUpdate()
       return
     }
     const res = await checkForUpdates(true)
     if (res === 'updated') {
-      toast.success('Update detected! Applying new version…')
+      toast.success('Update found! Applying changes and reloading…')
     } else if (res === 'up-to-date') {
       toast.success('QuickNote is up to date.')
     } else {
