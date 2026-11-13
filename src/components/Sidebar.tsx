@@ -16,7 +16,6 @@ import {
   User,
   FileText,
   Archive,
-  Sparkles,
 } from 'lucide-react'
 import { Logo, NoteGlyph } from '@/components/Logo'
 import { PWAInstallButton } from '@/components/PWAInstallExperience'
@@ -35,7 +34,6 @@ interface NavItem {
 const PRIMARY: NavItem[] = [
   { to: '/app', label: 'Dashboard', icon: Home, end: true },
   { to: '/app/notes', label: 'All Notes', icon: FileText },
-  { to: '/app/chat', label: 'Gemini Chat', icon: Sparkles },
   { to: '/app/pinned', label: 'Pinned Notes', icon: Pin },
   { to: '/app/favorites', label: 'Favorites', icon: Star },
   { to: '/app/recent', label: 'Recent Notes', icon: Clock },

@@ -46,7 +46,6 @@ const NoteEditorPage = lazy(() => import("@/pages/NoteEditor").then((m) => ({ de
 const FoldersPage = lazy(() => import("@/pages/FoldersPage").then((m) => ({ default: m.FoldersPage })));
 const TagsPage = lazy(() => import("@/pages/TagsPage").then((m) => ({ default: m.TagsPage })));
 const SearchPage = lazy(() => import("@/pages/SearchPage").then((m) => ({ default: m.SearchPage })));
-const GeminiChatPage = lazy(() => import("@/pages/GeminiChatPage").then((m) => ({ default: m.GeminiChatPage })));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage").then((m) => ({ default: m.ProfilePage })));
 const HelpPage = lazy(() => import("@/pages/HelpPage").then((m) => ({ default: m.HelpPage })));
@@ -224,7 +223,6 @@ function AppRoutes() {
           <Route path="tags" element={<TagsPage />} />
           <Route path="tags/:tagId" element={<TagNotesPage />} />
           <Route path="search" element={<SearchPage />} />
-          <Route path="chat" element={<GeminiChatPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="help" element={<HelpPage />} />

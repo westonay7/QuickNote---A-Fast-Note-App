@@ -1,7 +1,4 @@
 {
   "name": "QuickNote",
-  "description": "Capture your thoughts. Keep everything organized.",
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "description": "Capture your thoughts. Keep everything organized."
 }
